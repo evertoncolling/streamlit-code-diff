@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/streamlit-code-diff.svg)](https://badge.fury.io/py/streamlit-code-diff)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://app-code-diff-demo.streamlit.app)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://app-code-diff-jdj4crt4jw3fwqzqpdlevq.streamlit.app)
 
 A simple Streamlit component for code diff visualization using [v-code-diff](https://github.com/keguigong/v-code-diff). Great for displaying code changes, git diffs, and side-by-side comparisons.
 
