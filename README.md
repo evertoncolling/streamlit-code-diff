@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/streamlit-code-diff.svg)](https://badge.fury.io/py/streamlit-code-diff)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-A simple Streamlit component for code diff visualization using [v-code-diff](https://github.com/keguigong/v-code-diff). Great for displaying code changes, git diffs, and side-by-side comparisons.
+A simple Streamlit component for code diff visualization using [v-code-diff](https://github.com/Shimada666/v-code-diff). Great for displaying code changes, git diffs, and side-by-side comparisons.
 
 ## Features
 - **Automatic Theme Detection** - Adapts to Streamlit's light/dark theme
@@ -109,6 +109,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- [v-code-diff](https://github.com/keguigong/v-code-diff) - The core diff visualization library
+- [v-code-diff](https://github.com/Shimada666/v-code-diff) - The core diff visualization library
 - [Streamlit](https://streamlit.io/) - The amazing framework that makes this possible
 - [highlight.js](https://highlightjs.org/) - Syntax highlighting support
