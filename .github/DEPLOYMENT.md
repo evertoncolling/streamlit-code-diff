@@ -133,10 +133,19 @@ Follow [Semantic Versioning](https://semver.org/):
 3. **Frontend build fails**:
    - Check that `package.json` and `package-lock.json` are up to date
    - Verify Node.js dependencies are correct
+   - Ensure the `build/` directory is created with bundle.js, bundle.css, and index.html
 
 4. **Python build fails**:
    - Check that `pyproject.toml` is valid
    - Ensure all Python dependencies are correctly specified
+   - For Python 3.13+: Ensure numpy>=1.26.0 (due to distutils removal)
+   - Verify hatchling `artifacts` configuration includes frontend/build files
+
+5. **"No such component directory" error after installation**:
+   - Frontend build files weren't included in the wheel
+   - Check wheel contents: `python -m zipfile -l dist/*.whl | grep build`
+   - Ensure MANIFEST.in includes the build directory
+   - Use the automated build script: `uv run python scripts/build_and_package.py`
 
 ### Debugging
 
@@ -149,7 +158,7 @@ Follow [Semantic Versioning](https://semver.org/):
    cd src/streamlit_code_diff/frontend
    npm ci && npm run build
    cd ../../..
-   uv build
+   uv build --wheel
    uv pip install dist/*.whl --force-reinstall
    ```
 

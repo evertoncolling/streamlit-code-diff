@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -49,12 +49,21 @@ jobs:
         run: uv sync --frozen
 
       - name: Build Python package
-        run: uv build
+        run: uv build --wheel
+
+      - name: Verify frontend files in wheel
+        run: |
+          echo "Checking wheel contents for frontend build files..."
+          python -m zipfile -l dist/*.whl | grep -E "build|bundle" || (echo "❌ Frontend build files missing from wheel" && exit 1)
+          echo "✅ Frontend build files found in wheel"
 
       - name: Test package installation
         run: |
           uv pip install dist/*.whl --force-reinstall
           python -c "from streamlit_code_diff import st_code_diff; print('✅ Package imports successfully')"
+
+      - name: Run package test script
+        run: uv run python scripts/test_package.py
 
       - name: Run basic functionality test
         run: |
