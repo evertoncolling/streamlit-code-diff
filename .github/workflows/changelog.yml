@@ -1,0 +1,129 @@
+name: Generate Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: 'From tag (e.g., v0.1.0) - leave empty for last tag'
+        required: false
+        type: string
+      to_tag:
+        description: 'To tag (e.g., v0.2.0) - leave empty for HEAD'
+        required: false
+        type: string
+      output_file:
+        description: 'Output file (default: CHANGELOG.md)'
+        required: false
+        type: string
+        default: 'CHANGELOG.md'
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for changelog generation
+      
+      - name: Get tag range
+        id: tags
+        run: |
+          if [ -z "${{ github.event.inputs.from_tag }}" ]; then
+            FROM_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          else
+            FROM_TAG="${{ github.event.inputs.from_tag }}"
+          fi
+          
+          if [ -z "${{ github.event.inputs.to_tag }}" ]; then
+            TO_TAG="HEAD"
+          else
+            TO_TAG="${{ github.event.inputs.to_tag }}"
+          fi
+          
+          echo "from_tag=$FROM_TAG" >> $GITHUB_OUTPUT
+          echo "to_tag=$TO_TAG" >> $GITHUB_OUTPUT
+          
+          echo "📊 Generating changelog from $FROM_TAG to $TO_TAG"
+      
+      - name: Generate changelog
+        run: |
+          OUTPUT_FILE="${{ github.event.inputs.output_file }}"
+          FROM_TAG="${{ steps.tags.outputs.from_tag }}"
+          TO_TAG="${{ steps.tags.outputs.to_tag }}"
+          
+          # Create changelog header
+          cat > "$OUTPUT_FILE" << 'EOF'
+          # Changelog
+          
+          All notable changes to this project will be documented in this file.
+          
+          EOF
+          
+          # Get current version from pyproject.toml
+          CURRENT_VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          
+          # Add current version section
+          echo "## [$CURRENT_VERSION] - $(date +%Y-%m-%d)" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          # Generate commit-based changelog
+          if [ -n "$FROM_TAG" ]; then
+            COMMIT_RANGE="${FROM_TAG}..${TO_TAG}"
+          else
+            COMMIT_RANGE="$TO_TAG"
+          fi
+          
+          echo "### 🚀 Features" >> "$OUTPUT_FILE"
+          git log --oneline --grep="feat" --grep="feature" --grep="add" -i $COMMIT_RANGE | sed 's/^/- /' >> "$OUTPUT_FILE" || echo "- No new features" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          echo "### 🐛 Bug Fixes" >> "$OUTPUT_FILE"
+          git log --oneline --grep="fix" --grep="bug" --grep="patch" -i $COMMIT_RANGE | sed 's/^/- /' >> "$OUTPUT_FILE" || echo "- No bug fixes" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          echo "### 🔧 Improvements" >> "$OUTPUT_FILE"
+          git log --oneline --grep="improve" --grep="enhance" --grep="update" --grep="refactor" -i $COMMIT_RANGE | sed 's/^/- /' >> "$OUTPUT_FILE" || echo "- No improvements" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          echo "### 📚 Documentation" >> "$OUTPUT_FILE"
+          git log --oneline --grep="doc" --grep="readme" --grep="comment" -i $COMMIT_RANGE | sed 's/^/- /' >> "$OUTPUT_FILE" || echo "- No documentation changes" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          echo "### 🔄 Other Changes" >> "$OUTPUT_FILE"
+          git log --oneline $COMMIT_RANGE --invert-grep --grep="feat\|feature\|add\|fix\|bug\|patch\|improve\|enhance\|update\|refactor\|doc\|readme\|comment" -i | sed 's/^/- /' >> "$OUTPUT_FILE" || echo "- No other changes" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          # Add installation section
+          echo "### 🛠️ Installation" >> "$OUTPUT_FILE"
+          echo "\`\`\`bash" >> "$OUTPUT_FILE"
+          echo "pip install streamlit-code-diff==$CURRENT_VERSION" >> "$OUTPUT_FILE"
+          echo "\`\`\`" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+          
+          echo "✅ Changelog generated successfully!"
+      
+      - name: Display changelog
+        run: |
+          echo "📄 Generated changelog:"
+          echo "===================="
+          cat "${{ github.event.inputs.output_file }}"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: update changelog"
+          title: "📝 Update Changelog"
+          body: |
+            ## 📝 Changelog Update
+            
+            This PR adds/updates the changelog with recent changes.
+            
+            **Generated from:** ${{ steps.tags.outputs.from_tag }} to ${{ steps.tags.outputs.to_tag }}
+            
+            Please review and edit the changelog as needed before merging.
+          branch: changelog-update
+          delete-branch: true
+          add-paths: |
+            ${{ github.event.inputs.output_file }} 

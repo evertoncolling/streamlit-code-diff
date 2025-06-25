@@ -103,23 +103,31 @@ jobs:
           git push origin "v${{ needs.check-version.outputs.version }}"
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: "v${{ needs.check-version.outputs.version }}"
-          release_name: "Release v${{ needs.check-version.outputs.version }}"
+          name: "Release v${{ needs.check-version.outputs.version }}"
           body: |
             ## 🚀 Release v${{ needs.check-version.outputs.version }}
             
-            **Published to PyPI:** https://pypi.org/project/streamlit-code-diff/${{ needs.check-version.outputs.version }}/
+            **📦 Published to PyPI:** https://pypi.org/project/streamlit-code-diff/${{ needs.check-version.outputs.version }}/
             
-            ### Install
+            ### 🛠️ Installation
             ```bash
             pip install streamlit-code-diff==${{ needs.check-version.outputs.version }}
             ```
             
-            ### Changes
-            This release was automatically generated from the version bump in `pyproject.toml`.
+            ### 📝 Changes
+            Check the commit history for detailed changes in this release.
+            
+            ### 🔗 Links
+            - [PyPI Package](https://pypi.org/project/streamlit-code-diff/${{ needs.check-version.outputs.version }}/)
+            - [Documentation](https://github.com/evertoncolling/streamlit-code-diff#readme)
+            - [Issues](https://github.com/evertoncolling/streamlit-code-diff/issues)
           draft: false
-          prerelease: false 
+          prerelease: false
+          files: |
+            dist/*.whl
+            dist/*.tar.gz 

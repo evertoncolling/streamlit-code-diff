@@ -4,10 +4,12 @@ This document explains how to set up automated deployment for the `streamlit-cod
 
 ## Overview
 
-The project uses two main GitHub Actions workflows:
+The project uses several GitHub Actions workflows:
 
 1. **`ci.yml`** - Continuous Integration: Tests the package on multiple Python versions for every PR
-2. **`publish.yml`** - Automated Publishing: Builds and publishes to PyPI when version is bumped
+2. **`publish.yml`** - Automated Publishing: Builds and publishes to PyPI when version is bumped, creates GitHub releases
+3. **`manual-release.yml`** - Manual GitHub Release: Create releases manually without PyPI publishing
+4. **`changelog.yml`** - Changelog Generation: Automatically generate changelogs from commit history
 
 ## Setup Instructions
 
@@ -90,6 +92,31 @@ You can also trigger the publish workflow manually:
 2. Select "Build and Publish to PyPI"
 3. Click "Run workflow"
 4. Select the branch and click "Run workflow"
+
+### Creating Manual Releases
+
+To create a GitHub release without publishing to PyPI:
+1. Go to **Actions** tab
+2. Select "Manual GitHub Release"
+3. Click "Run workflow"
+4. Fill in:
+   - **Tag name**: e.g., `v0.2.0`
+   - **Release name**: e.g., `Release v0.2.0`
+   - **Release notes**: Your changelog (supports Markdown)
+   - **Pre-release**: Check if it's a beta/alpha release
+   - **Draft**: Check to create as draft first
+
+### Generating Changelogs
+
+To automatically generate changelog from commit history:
+1. Go to **Actions** tab
+2. Select "Generate Changelog"
+3. Click "Run workflow"
+4. Fill in (all optional):
+   - **From tag**: Starting tag (leave empty for last tag)
+   - **To tag**: Ending tag (leave empty for HEAD)
+   - **Output file**: Filename (default: CHANGELOG.md)
+5. The workflow will create a PR with the generated changelog
 
 ## Development Workflow
 
