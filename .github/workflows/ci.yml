@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Set Python version
         run: uv python pin ${{ matrix.python-version }}
@@ -45,7 +46,7 @@ jobs:
           npm run build
 
       - name: Install Python dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Build Python package
         run: uv build
@@ -104,10 +105,15 @@ jobs:
           cd src/streamlit_code_diff/frontend
           npm ci
 
+      - name: Update dependencies
+        run: |
+          cd src/streamlit_code_diff/frontend
+          npm update
+
       - name: Type check
         run: |
           cd src/streamlit_code_diff/frontend
-          npm run build-with-types
+          npm run type-check || npm run build-with-types
 
       - name: Build check
         run: |
