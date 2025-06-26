@@ -1,6 +1,6 @@
 [project]
 name = "streamlit-code-diff"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Streamlit component for code diff visualization using v-code-diff"
 readme = "README.md"
 authors = [{ name = "Everton Colling", email = "evertoncolling@gmail.com" }]
