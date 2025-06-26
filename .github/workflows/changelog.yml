@@ -113,21 +113,19 @@ jobs:
           echo "===================="
           cat "${{ github.event.inputs.output_file }}"
       
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "docs: update changelog"
-          title: "📝 Update Changelog"
-          body: |
-            ## 📝 Changelog Update
+      - name: Commit changelog directly
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ github.event.inputs.output_file }}"
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update changelog
+
+            Generated from: ${{ steps.tags.outputs.from_tag }} to ${{ steps.tags.outputs.to_tag }}
             
-            This PR adds/updates the changelog with recent changes.
-            
-            **Generated from:** ${{ steps.tags.outputs.from_tag }} to ${{ steps.tags.outputs.to_tag }}
-            
-            Please review and edit the changelog as needed before merging.
-          branch: changelog-update
-          delete-branch: true
-          add-paths: |
-            ${{ github.event.inputs.output_file }} 
+            This changelog was automatically generated from commit history."
+            git push origin main
+            echo "✅ Changelog committed and pushed to main branch"
+          fi 
