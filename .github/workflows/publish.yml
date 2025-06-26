@@ -60,6 +60,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install frontend dependencies
         run: |
@@ -72,27 +73,39 @@ jobs:
           npm run build
 
       - name: Install Python dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Build Python package
         run: uv build --wheel
 
+      - name: Verify frontend files in wheel
+        run: |
+          echo "Checking wheel contents for frontend build files..."
+          uv run python -m zipfile -l dist/*.whl | grep -E "build|bundle" || (echo "❌ Frontend build files missing from wheel" && exit 1)
+          echo "✅ Frontend build files found in wheel"
+
       - name: Test installation
         run: |
           uv pip install dist/*.whl --force-reinstall
-          python -c "from streamlit_code_diff import st_code_diff; print('✅ Package imports successfully')"
+          uv run python -c "from streamlit_code_diff import st_code_diff; print('✅ Package imports successfully')"
 
-      - name: Publish to Test PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      - name: Check package metadata
         run: |
-          uv publish --repository testpypi dist/* || echo "⚠️ Test PyPI publish failed (might be duplicate version)"
+          uv run python -c "
+          import importlib.metadata
+          try:
+              dist = importlib.metadata.distribution('streamlit-code-diff')
+              print(f'✅ Package version: {dist.version}')
+              print(f'✅ Package name: {dist.metadata['Name']}')
+          except importlib.metadata.PackageNotFoundError:
+              print('❌ Package not found')
+              exit(1)
+          "
 
       - name: Publish to PyPI
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          UV_PUBLISH_USERNAME: __token__
+          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: uv publish dist/*
 
       - name: Create Git Tag
