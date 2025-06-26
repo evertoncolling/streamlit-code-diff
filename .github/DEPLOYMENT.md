@@ -24,11 +24,6 @@ The project uses several GitHub Actions workflows:
    - Scope: `Entire account` (or limit to specific project after first publish)
 5. Copy the token (starts with `pypi-`)
 
-#### For Test PyPI (Optional but Recommended):
-1. Go to [Test PyPI Account Settings](https://test.pypi.org/manage/account/)
-2. Follow the same process as above
-3. Copy the token
-
 ### 2. Configure GitHub Repository Secrets
 
 1. Go to your GitHub repository
@@ -37,26 +32,31 @@ The project uses several GitHub Actions workflows:
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
-| `PYPI_API_TOKEN` | `pypi-AgE...` | Your PyPI API token |
-| `TEST_PYPI_API_TOKEN` | `pypi-AgE...` | Your Test PyPI API token (optional) |
+| `PYPI_API_TOKEN` | `pypi-AgE...` | Your PyPI API token (used as UV_PUBLISH_PASSWORD) |
+
+**Note**: The workflow uses `uv publish` with `UV_PUBLISH_USERNAME=__token__` and `UV_PUBLISH_PASSWORD=$PYPI_API_TOKEN`
 
 ### 3. How the Automated Publishing Works
 
-#### Version Detection
-The workflow automatically detects version changes by:
+#### Smart Version Detection
+The workflow uses intelligent version checking by:
 1. Monitoring pushes to `main` branch that modify `pyproject.toml`
-2. Comparing the version in the current commit vs. previous commit
-3. Only proceeding if the version has changed
+2. Checking the current version in `pyproject.toml` against:
+   - Published versions on PyPI
+   - Existing GitHub releases
+3. Proceeding if the version hasn't been fully published (allows re-running failed releases)
+4. Supports partial failure recovery (e.g., PyPI published but GitHub release failed)
 
 #### Build Process
-When a version change is detected:
+When a version needs to be published:
 1. **Frontend Build**: Installs npm dependencies and builds the Vue.js component
 2. **Python Build**: Uses `uv build` to create wheel and source distributions
-3. **Testing**: Installs the built package to verify it works
-4. **Publishing**: 
-   - First publishes to Test PyPI (non-blocking)
-   - Then publishes to production PyPI
-5. **Release**: Creates a Git tag and GitHub release
+3. **Verification**: 
+   - Checks wheel contents for frontend build files
+   - Installs the built package to verify it works
+   - Validates package metadata
+4. **Publishing**: Publishes to PyPI (only if not already published)
+5. **Release**: Creates a Git tag and GitHub release via GitHub API
 
 ## Usage
 
@@ -87,11 +87,18 @@ When a version change is detected:
 
 ### Manual Publishing (if needed)
 
-You can also trigger the publish workflow manually:
+You can trigger the publish workflow manually to:
+- Re-attempt failed releases without bumping the version
+- Publish versions that were missed due to workflow issues
+- Create missing GitHub releases for already-published PyPI versions
+
+To run manually:
 1. Go to **Actions** tab
 2. Select "Build and Publish to PyPI"
 3. Click "Run workflow"
 4. Select the branch and click "Run workflow"
+
+The workflow will automatically detect what needs to be done based on the current `pyproject.toml` version vs. what's already published.
 
 ### Creating Manual Releases
 
@@ -131,7 +138,7 @@ To automatically generate changelog from commit history:
 
 3. **Create a Pull Request**:
    - The CI workflow will automatically run
-   - Tests will run on Python 3.8, 3.9, 3.10, 3.11, and 3.12
+   - Tests will run on Python 3.9, 3.10, 3.11, 3.12, and 3.13
    - Frontend will be built and tested
 
 4. **After PR is approved and merged**:
@@ -150,25 +157,32 @@ Follow [Semantic Versioning](https://semver.org/):
 ### Common Issues
 
 1. **"Package already exists" error**:
-   - You're trying to publish a version that already exists
-   - Bump the version number in `pyproject.toml`
+   - The workflow now handles this automatically - it will skip PyPI publishing if the version already exists
+   - If only PyPI is published but GitHub release is missing, it will create just the GitHub release
+   - For completely new versions, bump the version number in `pyproject.toml`
 
 2. **"Authentication failed" error**:
-   - Check that your PyPI API tokens are correctly set in GitHub secrets
-   - Ensure tokens have the correct scope
+   - Check that `PYPI_API_TOKEN` secret is correctly set in GitHub repository settings
+   - Ensure the token has the correct scope (project or account level)
+   - Verify the token starts with `pypi-` and is valid
 
-3. **Frontend build fails**:
+3. **"Git tag creation failed" error**:
+   - The workflow uses GitHub API to create tags (requires `contents: write` permission)
+   - This is automatically configured in the workflow - no action needed
+   - If you see permission errors, the workflow file may be corrupted
+
+4. **Frontend build fails**:
    - Check that `package.json` and `package-lock.json` are up to date
    - Verify Node.js dependencies are correct
    - Ensure the `build/` directory is created with bundle.js, bundle.css, and index.html
 
-4. **Python build fails**:
+5. **Python build fails**:
    - Check that `pyproject.toml` is valid
    - Ensure all Python dependencies are correctly specified
    - For Python 3.13+: Ensure numpy>=1.26.0 (due to distutils removal)
    - Verify hatchling `artifacts` configuration includes frontend/build files
 
-5. **"No such component directory" error after installation**:
+6. **"No such component directory" error after installation**:
    - Frontend build files weren't included in the wheel
    - Check wheel contents: `python -m zipfile -l dist/*.whl | grep build`
    - Ensure MANIFEST.in includes the build directory
