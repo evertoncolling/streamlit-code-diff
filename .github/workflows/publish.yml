@@ -4,49 +4,84 @@ on:
   push:
     branches: [main]
     paths: [pyproject.toml]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # Allow manual trigger to re-attempt failed releases
+  schedule:
+    - cron: '0 12 * * 1'  # Weekly check on Mondays at 12:00 UTC to catch any missed releases
 
 jobs:
   check-version:
+    # Smart version checking: compares current pyproject.toml version against PyPI and GitHub releases
+    # This allows re-running failed releases without bumping version numbers
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       should-publish: ${{ steps.version.outputs.should-publish }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2  # Need previous commit to compare
 
-      - name: Check if version changed
+      - name: Check if version needs publishing
         id: version
         run: |
           # Get current version
           CURRENT_VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "Current version: $CURRENT_VERSION"
 
-          # Get previous version (if exists)
-          git show HEAD~1:pyproject.toml > prev_pyproject.toml 2>/dev/null || echo 'version = "0.0.0"' > prev_pyproject.toml
-          PREV_VERSION=$(grep -E '^version = ' prev_pyproject.toml | sed 's/version = "\(.*\)"/\1/' || echo "0.0.0")
-          echo "Previous version: $PREV_VERSION"
+          # Check if version exists on PyPI
+          PYPI_EXISTS=false
+          if curl -s "https://pypi.org/pypi/streamlit-code-diff/$CURRENT_VERSION/json" | grep -q '"version"'; then
+            echo "✅ Version $CURRENT_VERSION already exists on PyPI"
+            PYPI_EXISTS=true
+          else
+            echo "❌ Version $CURRENT_VERSION does not exist on PyPI"
+          fi
 
-          # Check if version changed
-          if [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
-            echo "Version changed from $PREV_VERSION to $CURRENT_VERSION"
+          # Check if GitHub release exists
+          GITHUB_RELEASE_EXISTS=false
+          if curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+             "https://api.github.com/repos/${{ github.repository }}/releases/tags/v$CURRENT_VERSION" | grep -q '"tag_name"'; then
+            echo "✅ GitHub release v$CURRENT_VERSION already exists"
+            GITHUB_RELEASE_EXISTS=true
+          else
+            echo "❌ GitHub release v$CURRENT_VERSION does not exist"
+          fi
+
+          # Decide whether to publish
+          if [ "$PYPI_EXISTS" = "true" ] && [ "$GITHUB_RELEASE_EXISTS" = "true" ]; then
+            echo "📦 Version $CURRENT_VERSION already published to both PyPI and GitHub releases, skipping"
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+          elif [ "$PYPI_EXISTS" = "true" ] && [ "$GITHUB_RELEASE_EXISTS" = "false" ]; then
+            echo "🏷️ Version $CURRENT_VERSION exists on PyPI but missing GitHub release, will create release only"
+            echo "should-publish=github-only" >> $GITHUB_OUTPUT
+          elif [ "$PYPI_EXISTS" = "false" ]; then
+            echo "🚀 Version $CURRENT_VERSION needs to be published to PyPI (and GitHub release)"
             echo "should-publish=true" >> $GITHUB_OUTPUT
           else
-            echo "Version unchanged, skipping publish"
-            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "🤔 Unexpected state, will publish to be safe"
+            echo "should-publish=true" >> $GITHUB_OUTPUT
           fi
 
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
   build-and-publish:
     needs: check-version
-    if: needs.check-version.outputs.should-publish == 'true'
+    if: needs.check-version.outputs.should-publish != 'false'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show publish plan
+        run: |
+          echo "🎯 Publish Plan for v${{ needs.check-version.outputs.version }}:"
+          if [ "${{ needs.check-version.outputs.should-publish }}" = "true" ]; then
+            echo "  📦 Will publish to PyPI"
+            echo "  🏷️ Will create GitHub release"
+          elif [ "${{ needs.check-version.outputs.should-publish }}" = "github-only" ]; then
+            echo "  ⏭️ Will skip PyPI (already published)"
+            echo "  🏷️ Will create GitHub release"
+          else
+            echo "  ❓ Unexpected state: ${{ needs.check-version.outputs.should-publish }}"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -103,6 +138,7 @@ jobs:
           "
 
       - name: Publish to PyPI
+        if: needs.check-version.outputs.should-publish == 'true'
         env:
           UV_PUBLISH_USERNAME: __token__
           UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
